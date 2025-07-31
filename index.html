@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Burnout Assessment Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.1/chart.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .gradient-bg {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        }
+        .question-card {
+            transition: transform 0.2s ease-in-out;
+        }
+        .question-card:hover {
+            transform: translateY(-5px);
+        }
+        .heat-gradient {
+            background: linear-gradient(to right, #22c55e, #facc15, #f97316, #ef4444);
+        }
+        .result-card {
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        /* Custom radio button styles */
+        input[type="radio"] {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 1.5rem;
+            height: 1.5rem;
+            border: 2px solid #d1d5db;
+            border-radius: 50%;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        input[type="radio"]:checked {
+            border: 6px solid #4f46e5;
+        }
+        
+        input[type="radio"]:hover {
+             box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
+        }
+    </style>
+</head>
+<body class="gradient-bg text-gray-800 min-h-screen flex items-center justify-center p-4">
+
+    <main id="app-container" class="w-full max-w-4xl mx-auto">
+
+        <!-- Initial View: Welcome and Options -->
+        <div id="welcome-view" class="bg-white p-8 rounded-2xl shadow-2xl text-center">
+            <h1 class="text-4xl font-bold text-gray-900 mb-4">Burnout Assessment Dashboard</h1>
+            <p class="text-lg text-gray-600 mb-8 max-w-2xl mx-auto">This tool is designed to help you reflect on your well-being. It is based on established burnout research but is not a clinical diagnosis. Your responses are saved anonymously.</p>
+            <div class="flex flex-col sm:flex-row justify-center gap-4">
+                <button id="start-btn" class="bg-indigo-600 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-indigo-700 transition-transform transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-indigo-300">Start New Assessment</button>
+                <button id="retrieve-btn" class="bg-gray-200 text-gray-800 font-bold py-3 px-6 rounded-lg shadow-md hover:bg-gray-300 transition-transform transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-gray-300">View Past Results</button>
+            </div>
+        </div>
+
+        <!-- Questionnaire View -->
+        <div id="questionnaire-view" class="hidden">
+            <div class="bg-white p-8 rounded-2xl shadow-2xl">
+                <h2 class="text-3xl font-bold text-center mb-2">Work & Well-being Questionnaire</h2>
+                <p class="text-center text-gray-500 mb-8">Please rate how frequently you have felt this way about your work recently.</p>
+                <form id="burnout-form" class="space-y-8">
+                    <!-- Questions will be injected here by JS -->
+                </form>
+                <div class="mt-10 text-center">
+                    <button type="submit" form="burnout-form" class="bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg shadow-lg hover:bg-indigo-700 transition-transform transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-indigo-300">Calculate My Results</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results View -->
+        <div id="results-view" class="hidden">
+             <div class="bg-white/70 backdrop-blur-xl p-8 rounded-2xl shadow-2xl">
+                <h2 class="text-3xl font-bold text-center mb-2 text-gray-900">Your Burnout Profile</h2>
+                <p class="text-center text-gray-600 mb-8">This is a snapshot of your current well-being based on your responses.</p>
+
+                <!-- Overall Heat Score -->
+                <div class="mb-10">
+                    <h3 class="text-xl font-semibold text-center mb-4">Overall Burnout Risk</h3>
+                    <div class="w-full h-8 rounded-full heat-gradient shadow-inner">
+                        <div id="heat-marker-container" class="relative h-full">
+                            <div id="heat-marker" class="absolute top-[-4px] w-1 h-10 bg-white border-2 border-gray-700 rounded-full shadow-lg" style="left: 50%;">
+                                <div class="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-gray-800 text-white text-sm rounded-md shadow-lg" id="heat-label">At Risk</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex justify-between text-xs text-gray-600 mt-2 px-1">
+                        <span>Healthy</span>
+                        <span>Low Risk</span>
+                        <span>At Risk</span>
+                        <span>High Risk</span>
+                        <span>Burnout</span>
+                    </div>
+                </div>
+
+                <!-- Detailed Breakdown -->
+                <div class="grid md:grid-cols-3 gap-6 text-center">
+                    <div class="result-card p-6 rounded-xl shadow-lg">
+                        <h4 class="text-lg font-semibold mb-3">Emotional Exhaustion</h4>
+                        <p id="ee-score" class="text-3xl font-bold text-indigo-600 mb-3"></p>
+                        <p id="ee-level" class="font-medium"></p>
+                    </div>
+                    <div class="result-card p-6 rounded-xl shadow-lg">
+                        <h4 class="text-lg font-semibold mb-3">Cynicism & Detachment</h4>
+                        <p id="cd-score" class="text-3xl font-bold text-indigo-600 mb-3"></p>
+                        <p id="cd-level" class="font-medium"></p>
+                    </div>
+                    <div class="result-card p-6 rounded-xl shadow-lg">
+                        <h4 class="text-lg font-semibold mb-3">Professional Efficacy</h4>
+                        <p id="pe-score" class="text-3xl font-bold text-indigo-600 mb-3"></p>
+                        <p id="pe-level" class="font-medium"></p>
+                    </div>
+                </div>
+                
+                 <!-- Anonymous ID and Actions -->
+                <div class="mt-10 bg-indigo-50 border-2 border-indigo-200 p-6 rounded-lg text-center">
+                    <p class="font-semibold text-gray-800">Save your anonymous ID to track your results over time:</p>
+                    <div class="my-3 flex justify-center items-center gap-2">
+                        <input type="text" id="user-id-box" readonly class="bg-white border border-gray-300 text-gray-700 text-sm rounded-lg p-2.5 w-full max-w-xs text-center font-mono">
+                        <button id="copy-id-btn" class="p-2.5 bg-gray-200 rounded-lg hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg>
+                        </button>
+                    </div>
+                     <p id="copy-feedback" class="text-sm text-green-600 h-4"></p>
+                    <div class="mt-4">
+                         <button id="back-to-start-btn" class="bg-indigo-600 text-white font-bold py-2 px-5 rounded-lg shadow-md hover:bg-indigo-700 transition">Done</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Retrieve View -->
+        <div id="retrieve-view" class="hidden">
+            <div class="bg-white p-8 rounded-2xl shadow-2xl text-center">
+                <h2 class="text-3xl font-bold text-gray-900 mb-4">View Past Results</h2>
+                <p class="text-gray-600 mb-6">Enter your anonymous ID to see your previously saved assessment.</p>
+                <form id="retrieve-form" class="flex flex-col sm:flex-row justify-center items-center gap-3">
+                    <input type="text" id="retrieve-id-input" placeholder="Paste your anonymous ID here" class="font-mono text-center form-input px-4 py-3 border-gray-300 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 w-full max-w-md">
+                    <button type="submit" class="bg-indigo-600 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-indigo-700 transition-transform transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-indigo-300 w-full sm:w-auto">Retrieve</button>
+                </form>
+                 <p id="retrieve-error" class="text-red-500 mt-4 h-5"></p>
+                <button id="back-from-retrieve-btn" class="mt-6 text-indigo-600 hover:underline">Back to Home</button>
+            </div>
+        </div>
+    </main>
+
+    <script type="module">
+        // Firebase Imports
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+        // --- App State and Config ---
+        
+        // Firebase config is provided by the execution environment.
+const firebaseConfig = {
+  apiKey: "AIzaSyCQaDwVSE-CPsMgAUpvPq8yQis2X9zNQOw",
+  authDomain: "burnout-dashboard.firebaseapp.com",
+  projectId: "burnout-dashboard",
+  storageBucket: "burnout-dashboard.firebasestorage.app",
+  messagingSenderId: "588808440788",
+  appId: "1:588808440788:web:1878442f3b2b771aad2441",
+  measurementId: "G-B6E2SKSLGP"
+};
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'burnout-dashboard-app';
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        let currentUserId = null;
+
+        const questions = [
+            // Emotional Exhaustion (EE) - Higher score = more burnout
+            { id: 'ee1', text: "I feel emotionally drained from my work.", category: 'ee' },
+            { id: 'ee2', text: "I feel used up at the end of the workday.", category: 'ee' },
+            { id: 'ee3', text: "I feel tired when I have to face another day on the job.", category: 'ee' },
+            { id: 'ee4', text: "I feel burned out from my work.", category: 'ee' },
+            { id: 'ee5', text: "I feel frustrated by my job.", category: 'ee' },
+            // Cynicism & Detachment (CD) - Higher score = more burnout
+            { id: 'cd1', text: "I have become more cynical about whether my work contributes anything.", category: 'cd' },
+            { id: 'cd2', text: "I doubt the significance of my work.", category: 'cd' },
+            { id: 'cd3', text: "I've become less interested in my work since I started this job.", category: 'cd' },
+            { id: 'cd4', text: "I've become less enthusiastic about my work.", category: 'cd' },
+            { id: 'cd5', text: "I just want to do my job and not be bothered.", category: 'cd' },
+            // Professional Efficacy (PE) - Lower score = more burnout (these are reverse scored)
+            { id: 'pe1', text: "I can effectively solve the problems that arise in my work.", category: 'pe' },
+            { id: 'pe2', text: "I feel I'm making an effective contribution to what this organization does.", category: 'pe' },
+            { id: 'pe3', text: "I feel exhilarated when I accomplish something at work.", category: 'pe' },
+            { id: 'pe4', text: "I have accomplished many worthwhile things in this job.", category: 'pe' },
+            { id: 'pe5', text: "In my work, I deal with emotional problems very calmly.", category: 'pe' },
+        ];
+        
+        const likertScale = [
+            { label: 'Never', value: 0 },
+            { label: 'Rarely', value: 1 },
+            { label: 'Sometimes', value: 2 },
+            { label: 'Often', value: 3 },
+            { label: 'Always', value: 4 }
+        ];
+
+        // --- DOM Elements ---
+        const welcomeView = document.getElementById('welcome-view');
+        const questionnaireView = document.getElementById('questionnaire-view');
+        const resultsView = document.getElementById('results-view');
+        const retrieveView = document.getElementById('retrieve-view');
+        const burnoutForm = document.getElementById('burnout-form');
+        
+        // --- Event Listeners ---
+        document.getElementById('start-btn').addEventListener('click', () => {
+            switchView('questionnaire');
+        });
+        
+        document.getElementById('retrieve-btn').addEventListener('click', () => {
+            switchView('retrieve');
+        });
+
+        document.getElementById('back-from-retrieve-btn').addEventListener('click', () => switchView('welcome'));
+        document.getElementById('back-to-start-btn').addEventListener('click', () => switchView('welcome'));
+
+        burnoutForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(burnoutForm);
+            const answers = {};
+            for (let [key, value] of formData.entries()) {
+                answers[key] = parseInt(value);
+            }
+            
+            if (Object.keys(answers).length < questions.length) {
+                alert("Please answer all questions before submitting.");
+                return;
+            }
+
+            const scores = calculateScores(answers);
+            displayResults(scores);
+            await saveResults(scores);
+            switchView('results');
+        });
+        
+        document.getElementById('retrieve-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const idToRetrieve = document.getElementById('retrieve-id-input').value.trim();
+            const errorEl = document.getElementById('retrieve-error');
+            if (!idToRetrieve) {
+                errorEl.textContent = "Please enter an ID.";
+                return;
+            }
+            try {
+                // FIX: Changed path to user-specific private collection
+                const docRef = doc(db, `artifacts/${appId}/users/${idToRetrieve}/assessments`, 'profile');
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    errorEl.textContent = "";
+                    const data = docSnap.data();
+                    displayResults(data.scores);
+                    document.getElementById('user-id-box').value = idToRetrieve;
+                    switchView('results');
+                } else {
+                    errorEl.textContent = "No assessment found with that ID.";
+                }
+            } catch (err) {
+                console.error("Error retrieving document:", err);
+                errorEl.textContent = "Could not retrieve results. Please try again.";
+            }
+        });
+        
+        document.getElementById('copy-id-btn').addEventListener('click', () => {
+            const idBox = document.getElementById('user-id-box');
+            idBox.select();
+            document.execCommand('copy');
+            const feedback = document.getElementById('copy-feedback');
+            feedback.textContent = 'Copied to clipboard!';
+            setTimeout(() => { feedback.textContent = '' }, 2000);
+        });
+
+        // --- Core Functions ---
+        
+        function switchView(viewName) {
+            welcomeView.classList.add('hidden');
+            questionnaireView.classList.add('hidden');
+            resultsView.classList.add('hidden');
+            retrieveView.classList.add('hidden');
+            
+            document.getElementById(`${viewName}-view`).classList.remove('hidden');
+        }
+
+        function renderQuestions() {
+            let html = '';
+            let categoryTitle = '';
+            
+            questions.forEach((q, index) => {
+                let currentCategoryTitle = getCategoryTitle(q.category);
+                if (categoryTitle !== currentCategoryTitle) {
+                    categoryTitle = currentCategoryTitle;
+                    html += `<h3 class="text-xl font-semibold text-gray-800 border-b-2 border-indigo-200 pb-2 mb-6 mt-4">${categoryTitle}</h3>`;
+                }
+
+                html += `
+                    <div class="question-card bg-gray-50 p-6 rounded-xl border border-gray-200 shadow-sm">
+                        <p class="font-medium text-lg mb-4">${index + 1}. ${q.text}</p>
+                        <div class="flex flex-wrap justify-between items-center gap-4">
+                            <span class="text-sm text-gray-500">Strongly Disagree</span>
+                            <div class="flex items-center justify-center gap-x-4 sm:gap-x-6">
+                                ${likertScale.map(option => `
+                                    <label class="flex flex-col items-center cursor-pointer">
+                                        <input type="radio" name="${q.id}" value="${option.value}" required>
+                                        <span class="text-xs mt-2 font-medium text-gray-600">${option.label}</span>
+                                    </label>
+                                `).join('')}
+                            </div>
+                             <span class="text-sm text-gray-500">Strongly Agree</span>
+                        </div>
+                    </div>
+                `;
+            });
+            burnoutForm.innerHTML = html;
+        }
+
+        function getCategoryTitle(category) {
+            switch(category) {
+                case 'ee': return 'Emotional Toll';
+                case 'cd': return 'Work Outlook';
+                case 'pe': return 'Sense of Accomplishment';
+                default: return 'Question';
+            }
+        }
+
+        function calculateScores(answers) {
+            const maxScorePerQuestion = 4;
+            const numQuestionsPerCat = 5;
+            const maxCatScore = maxScorePerQuestion * numQuestionsPerCat; // 20
+
+            let eeScore = 0;
+            let cdScore = 0;
+            let peScoreRaw = 0;
+
+            for (const q of questions) {
+                const answerValue = answers[q.id];
+                if (q.category === 'ee') eeScore += answerValue;
+                if (q.category === 'cd') cdScore += answerValue;
+                if (q.category === 'pe') peScoreRaw += answerValue;
+            }
+            
+            // PE is reverse scored. High raw score is good, low is bad.
+            // We flip it so that a high score contributes to burnout, like the others.
+            const peScore = maxCatScore - peScoreRaw;
+
+            // Normalize scores to a 0-100 scale for easier interpretation
+            const eePercent = (eeScore / maxCatScore) * 100;
+            const cdPercent = (cdScore / maxCatScore) * 100;
+            const pePercent = (peScore / maxCatScore) * 100;
+
+            // Weighted overall score. EE is the core component.
+            const overallScore = (eePercent * 0.5) + (cdPercent * 0.3) + (pePercent * 0.2);
+
+            return {
+                ee: eePercent,
+                cd: cdPercent,
+                pe: pePercent,
+                overall: overallScore
+            };
+        }
+
+        function displayResults(scores) {
+            // Overall Heat Score
+            const heatMarker = document.getElementById('heat-marker');
+            const heatLabel = document.getElementById('heat-label');
+            heatMarker.style.left = `${scores.overall}%`;
+            
+            const overallCategory = getCategory(scores.overall);
+            heatLabel.textContent = overallCategory.level;
+            heatLabel.style.backgroundColor = overallCategory.color;
+            
+            // Detailed Scores
+            const eeCat = getCategory(scores.ee);
+            document.getElementById('ee-score').textContent = `${Math.round(scores.ee)}/100`;
+            document.getElementById('ee-level').textContent = eeCat.level;
+            document.getElementById('ee-level').style.color = eeCat.color;
+
+            const cdCat = getCategory(scores.cd);
+            document.getElementById('cd-score').textContent = `${Math.round(scores.cd)}/100`;
+            document.getElementById('cd-level').textContent = cdCat.level;
+            document.getElementById('cd-level').style.color = cdCat.color;
+            
+            // For PE, we display the "positive" score (efficacy) but color based on burnout contribution
+            const peCat = getCategory(scores.pe);
+            const efficacyScore = 100 - scores.pe;
+            document.getElementById('pe-score').textContent = `${Math.round(efficacyScore)}/100`;
+            document.getElementById('pe-level').textContent = peCat.level;
+            document.getElementById('pe-level').style.color = peCat.color;
+        }
+
+        function getCategory(score) {
+            if (score < 20) return { level: 'Healthy', color: '#22c55e' }; // green-500
+            if (score < 40) return { level: 'Low Risk', color: '#84cc16' }; // lime-500
+            if (score < 60) return { level: 'At Risk', color: '#f97316' }; // orange-500
+            if (score < 80) return { level: 'High Risk', color: '#ef4444' }; // red-500
+            return { level: 'Burnout', color: '#b91c1c' }; // red-700
+        }
+        
+        async function saveResults(scores) {
+            if (!currentUserId) {
+                console.error("No user signed in. Cannot save results.");
+                document.getElementById('user-id-box').value = `local-id-${Date.now()}`;
+                return;
+            }
+            try {
+                // FIX: Changed path to user-specific private collection for security
+                const docRef = doc(db, `artifacts/${appId}/users/${currentUserId}/assessments`, 'profile');
+                await setDoc(docRef, {
+                    userId: currentUserId,
+                    scores: scores,
+                    createdAt: serverTimestamp()
+                });
+                document.getElementById('user-id-box').value = currentUserId;
+            } catch (error) {
+                console.error("Error writing document: ", error);
+                document.getElementById('user-id-box').value = `error-saving-${Date.now()}`;
+            }
+        }
+
+        // --- Initialization ---
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                currentUserId = user.uid;
+            } else {
+                currentUserId = null;
+                try {
+                    const userCredential = await signInAnonymously(auth);
+                    currentUserId = userCredential.user.uid;
+                } catch (error) {
+                    console.error("Anonymous sign-in failed:", error);
+                }
+            }
+        });
+
+        renderQuestions();
+        switchView('welcome');
+
+    </script>
+</body>
+</html>
